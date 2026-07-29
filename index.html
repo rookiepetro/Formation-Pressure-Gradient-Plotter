@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>GeoPressure Pro | Global Edition</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GeoPressure Pro | Formation Tester</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     
@@ -11,30 +10,46 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     
     <style>
-        :root { --geo-dark: #1a252f; }
-        body { background: #fdfdfd; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        :root { --geo-dark: #1a252f; --geo-accent: #3498db; }
+        body { background: #fdfdfd; font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; }
         .sidebar { height: calc(100vh - 56px); overflow-y: auto; background: white; border-right: 1px solid #ddd; padding: 15px; }
         .main-content { height: calc(100vh - 56px); padding: 15px; background: #f4f7f6; }
         .chart-card { height: 100%; background: white; border-radius: 8px; border: 1px solid #ccc; padding: 10px; position: relative; }
         .navbar { background: var(--geo-dark); }
-        .nav-link { color: rgba(255,255,255,0.8) !important; cursor: pointer; }
+        .nav-link { color: rgba(255,255,255,0.8) !important; font-size: 0.9rem; cursor: pointer; transition: 0.2s; }
         .nav-link:hover { color: #fff !important; }
-        .scale-input { width: 48%; display: inline-block; font-size: 0.75rem; }
         .data-table-wrapper { max-height: 200px; overflow-y: auto; font-size: 0.8rem; border: 1px solid #ddd; }
-        .selected-row { background-color: #fff3cd !important; font-weight: bold; }
-        .gradient-item { border-left: 5px solid; padding: 8px; margin-bottom: 5px; background: #f8f9fa; font-size: 0.85rem; display: flex; justify-content: space-between; }
-        .btn-delete { color: #dc3545; cursor: pointer; }
+        .selected-row { background-color: #ffeb3b !important; color: #000; font-weight: bold; }
+        .scale-input { width: 48%; display: inline-block; font-size: 0.75rem; }
+        .gradient-item { border-left: 5px solid; padding: 8px 10px; margin-bottom: 5px; background: #f8f9fa; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; transition: 0.2s; }
+        .gradient-item:hover { background: #f1f3f5; }
+        .btn-delete { color: #dc3545; cursor: pointer; font-size: 1.1rem; }
+        .btn-delete:hover { color: #a71d2a; }
+        .cursor-pointer { cursor: pointer; }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-expand-lg navbar-dark px-3 shadow-sm">
-    <a class="navbar-brand fw-bold" href="#"><i class="bi bi-globe"></i> GeoPressure Global</a>
+    <a class="navbar-brand fw-bold" href="#"><i class="bi bi-graph-down"></i> Formation Tester Pro</a>
     <div class="collapse navbar-collapse justify-content-end">
-        <ul class="navbar-nav">
-            <li class="nav-item"><a class="nav-link btn btn-outline-light btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#helpModal">User Manual</a></li>
+        <ul class="navbar-nav align-items-center">
+            <li class="nav-item me-3">
+                <a class="nav-link text-warning fw-bold" href="dfts_excess.php" target="_blank"><i class="bi bi-speedometer2"></i> Switch to Excess Pressure</a>
+            </li>
+			<li class="nav-item me-3">
+                <a class="nav-link text-warning fw-bold" href="dfts_multi.php"target="_blank"><i class="bi bi-speedometer2"></i> Multi Well Pressure</a>
+            </li>
+			
+            <li class="nav-item">
+                <a class="nav-link btn btn-outline-light btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#helpModal">
+                    <i class="bi bi-book"></i> User Manual
+                </a>
+            </li>
         </ul>
     </div>
 </nav>
@@ -42,9 +57,13 @@
 <div class="container-fluid">
     <div class="row">
         <div class="col-md-3 sidebar">
+            
             <div class="card shadow-sm mb-3 border-0 bg-light">
                 <div class="card-body p-2">
-                    <label class="fw-bold small text-muted">PLOT SCALE</label>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="fw-bold small text-muted mb-0">PLOT SCALE</label>
+                        <button class="btn btn-outline-secondary btn-sm py-0" style="font-size: 0.7rem;" onclick="resetZoom()">Reset Zoom</button>
+                    </div>
                     <div class="mb-1">
                         <input type="number" id="xMin" class="form-control form-control-sm scale-input" placeholder="Press Min" onchange="updateAxes()">
                         <input type="number" id="xMax" class="form-control form-control-sm scale-input" placeholder="Press Max" onchange="updateAxes()">
@@ -68,17 +87,31 @@
                 <div class="card-body p-2">
                     <label class="fw-bold small text-muted">2. GRADIENT ANALYSIS</label>
                     <div class="data-table-wrapper mb-2 mt-1">
-                        <table class="table table-sm table-hover mb-0"><tbody id="tableBody"></tbody></table>
+                        <table class="table table-sm table-hover mb-0" id="pointsTable">
+                            <thead class="table-light sticky-top"><tr><th>Sel</th><th>Depth</th><th>Press</th></tr></thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
                     </div>
+                    
                     <div class="row g-2 mb-2">
-                        <div class="col-6"><input type="number" id="extCycles" class="form-control form-control-sm" value="1.5" step="0.5" placeholder="Cycles"></div>
-                        <div class="col-6"><input type="text" id="lineLabel" class="form-control form-control-sm" placeholder="Zone Name"></div>
+                        <div class="col-6">
+                            <label class="small fw-bold text-muted">Extension (Cycles)</label>
+                            <input type="number" id="extCycles" class="form-control form-control-sm" value="1.5" step="0.5" placeholder="1.0">
+                        </div>
+                        <div class="col-6">
+                            <label class="small fw-bold text-muted">Zone Name</label>
+                            <input type="text" id="lineLabel" class="form-control form-control-sm" placeholder="e.g. Oil Leg">
+                        </div>
                     </div>
+
                     <div class="form-check mb-2">
-                        <input class="form-check-input" type="checkbox" id="showLabelsCheck" checked onchange="chart.update()">
-                        <label class="form-check-label small text-muted">Show Density Labels</label>
+                        <input class="form-check-input" type="checkbox" id="showLabelsCheck" checked onchange="toggleLabels()">
+                        <label class="form-check-label small text-muted" for="showLabelsCheck">
+                            Show Density Labels on Plot
+                        </label>
                     </div>
-                    <button onclick="calculateLocally()" class="btn btn-primary btn-sm w-100">Draw Gradient Line</button>
+
+                    <button onclick="calculateAndSave()" class="btn btn-primary btn-sm w-100">Draw Gradient Line</button>
                 </div>
             </div>
 
@@ -93,42 +126,108 @@
         <div class="col-md-9 main-content">
             <div class="chart-card shadow-sm d-flex flex-column">
                 <div class="d-flex justify-content-end mb-2">
-                    <button onclick="savePlotImage()" class="btn btn-outline-dark btn-sm"><i class="bi bi-camera"></i> Save Plot</button>
+                    <button onclick="savePlotImage()" class="btn btn-outline-dark btn-sm"><i class="bi bi-camera"></i> Save Plot Image</button>
                 </div>
-                <div style="flex-grow: 1; position: relative;"><canvas id="pressureChart"></canvas></div>
+                <div style="flex-grow: 1; position: relative;">
+                    <canvas id="pressureChart"></canvas>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <div class="modal fade" id="helpModal" tabindex="-1">
-    <div class="modal-dialog"><div class="modal-content">
-        <div class="modal-header bg-dark text-white"><h5 class="modal-title">User Manual</h5><button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button></div>
-        <div class="modal-body">
-            <h6>How to use:</h6>
-            <ul>
-                <li>Paste Depth (m) and Pressure (psi) columns.</li>
-                <li>Select points in the table to define a zone.</li>
-                <li>Click "Draw Gradient Line".</li>
-                <li>The density is calculated automatically using Linear Regression in your browser.</li>
-            </ul>
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title"><i class="bi bi-book"></i> User Manual: Formation Tester Pro</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <h6>1. Overview</h6>
+                <p class="small text-muted mb-2">
+                    This tool plots Formation Pressure (X-axis) against True Vertical Depth (Y-axis, reversed). It is designed to identify fluid gradients, calculate fluid densities, and determine fluid contacts (e.g., Gas-Oil Contact, Oil-Water Contact).
+                </p>
+                
+                <hr class="my-3">
+                
+                <h6>2. How to Load Data</h6>
+                <ul class="small text-muted">
+                    <li>Prepare your data in Excel: Column A = <strong>Depth (m)</strong>, Column B = <strong>Pressure (psi)</strong>.</li>
+                    <li>Copy both columns (do not include the header text).</li>
+                    <li>Paste them into the <strong>"Paste Data"</strong> text box in the sidebar.</li>
+                    <li>Click <strong>"Load Data"</strong>. The points will immediately appear on the chart as black dots.</li>
+                </ul>
+                
+                <hr class="my-3">
+                
+                <h6>3. Drawing Gradients & Interpreting Fluids</h6>
+                <ol class="small text-muted">
+                    <li>In the <strong>Gradient Analysis</strong> table, click the rows corresponding to a specific fluid leg (e.g., points in the Water Zone). Selected points will turn yellow on the plot.</li>
+                    <li>Set the <strong>Extension (Cycles)</strong> parameter. 
+                        <ul>
+                            <li>A cycle of <code>1.0</code> draws the regression line exactly across your selected points.</li>
+                            <li>A cycle of <code>2.0</code> or <code>3.0</code> extends the line further up and down the wellbore. This helps you visually find intersections with other fluid gradients.</li>
+                        </ul>
+                    </li>
+                    <li>Type a <strong>Zone Name</strong> (e.g., "Water Leg").</li>
+                    <li><strong>Labels:</strong> Use the <em>"Show Density Labels on Plot"</em> checkbox to toggle text boxes on/off.</li>
+                    <li>Click <strong>"Draw Gradient Line"</strong>. A colored dashed line will appear.</li>
+                </ol>
+                
+                <hr class="my-3">
+
+                <h6>4. How Fluid Density is Calculated (The Math)</h6>
+                <p class="small text-muted mb-2">
+                    The tool determines fluid density directly from the slope of the line you draw through your pressure points.
+                </p>
+                <ul class="small text-muted">
+                    <li><strong>Step 1:</strong> The tool uses least-squares linear regression on your selected points to find the pressure gradient: <br>
+                    $$Gradient = \frac{\Delta P}{\Delta TVD} \ \text{(in psi/m)}$$</li>
+                    <li><strong>Step 2:</strong> It converts the pressure gradient into fluid density. Because pure water (1.0 g/cc) exerts a hydrostatic pressure gradient of roughly 1.4223 psi/m, the tool applies this conversion constant: <br>
+                    $$Density \ (\text{g/cc}) = \frac{Gradient}{1.4223}$$</li>
+                    <li><strong>Reference Values:</strong><br>
+                        • <strong>Gas:</strong> ~0.10 to 0.35 g/cc<br>
+                        • <strong>Oil:</strong> ~0.60 to 0.90 g/cc<br>
+                        • <strong>Water:</strong> ~1.00 to 1.15 g/cc
+                    </li>
+                </ul>
+                
+                
+
+                <hr class="my-3">
+                
+                <h6>5. Advanced Controls</h6>
+                <ul class="small text-muted">
+                    <li><strong>Zoom & Pan:</strong> Use your mouse wheel to zoom in on specific points. Hold <strong>Ctrl</strong> (or Command on Mac) and drag the chart to pan around. Click "Reset Zoom" to snap back.</li>
+                    <li><strong>Export:</strong> Click the <strong>"Save Plot Image"</strong> button to download a high-resolution PNG with a white background, ready to be pasted into your log reports.</li>
+                    <li><strong>Excess Pressure:</strong> Click the <em>"Switch to Excess Pressure"</em> link in the top header to use the Alton Brown method, which is superior for detecting very subtle pressure barriers and supercharging effects.</li>
+                </ul>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close Manual</button>
+            </div>
         </div>
-    </div></div>
+    </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
+// Register DataLabels plugin
 Chart.register(ChartDataLabels);
+
 let chart;
 let allData = [];
 let savedLines = [];
 
 const whiteBackgroundPlugin = {
     id: 'customCanvasBackgroundColor',
-    beforeDraw: (chart) => {
+    beforeDraw: (chart, args, options) => {
         const {ctx} = chart;
         ctx.save();
-        ctx.fillStyle = '#ffffff';
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = options.color || '#ffffff';
         ctx.fillRect(0, 0, chart.width, chart.height);
         ctx.restore();
     }
@@ -138,17 +237,42 @@ function initChart() {
     const ctx = document.getElementById('pressureChart').getContext('2d');
     chart = new Chart(ctx, {
         type: 'scatter',
-        data: { datasets: [{ label: 'Points', data: [], backgroundColor: '#000', pointRadius: 5, datalabels: {display:false} }, { label: 'Selected', data: [], backgroundColor: '#f1c40f', pointRadius: 7, borderColor: '#000', borderWidth: 1, datalabels: {display:false} }] },
+        data: {
+            datasets: [
+                { label: 'Background Points', data: [], backgroundColor: '#000000', pointRadius: 5, datalabels: { display: false } },
+                { label: 'Active Selection', data: [], backgroundColor: '#f1c40f', pointRadius: 7, borderColor: '#000', borderWidth: 1, datalabels: { display: false } }
+            ]
+        },
         options: {
             responsive: true, maintainAspectRatio: false,
-            scales: { x: { title: {display:true, text:'Pressure (psi)'}, position:'top' }, y: { reverse:true, title: {display:true, text:'Depth (m TVD)'} } },
+            scales: {
+                x: { title: { display: true, text: 'Formation Pressure (psi)' }, position: 'top', grid: { color: '#eee' } },
+                y: { reverse: true, title: { display: true, text: 'Depth (m)' }, grid: { color: '#eee' } }
+            },
             plugins: {
                 legend: { display: false },
-                zoom: { pan: {enabled:true, modifierKey:'ctrl'}, zoom: {wheel:{enabled:true}, pinch:{enabled:true}, mode:'xy'} },
+                customCanvasBackgroundColor: { color: '#ffffff' },
+                zoom: {
+                    pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' },
+                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+                },
+                // CONFIG FOR LABELS
                 datalabels: {
-                    display: function(context) { return document.getElementById('showLabelsCheck').checked && context.dataset.type === 'line' && context.dataIndex === 1; },
-                    backgroundColor: null, borderRadius: 0, borderWidth: 0, color: (ctx) => ctx.dataset.borderColor,
-                    font: { weight: 'bold', size: 12 }, align: 'top', offset: 10, anchor: 'center',
+                    display: function(context) {
+                        // Check global toggle
+                        const showLabels = document.getElementById('showLabelsCheck').checked;
+                        // Only display if toggle is ON, it's a line dataset, and it's the middle point
+                        return showLabels && context.dataset.type === 'line' && context.dataIndex === 1;
+                    },
+                    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+                    borderRadius: 4,
+                    borderWidth: 1,
+                    borderColor: (ctx) => ctx.dataset.borderColor,
+                    color: (ctx) => ctx.dataset.borderColor,
+                    font: { weight: 'bold', size: 11 },
+                    padding: 6,
+                    align: 'right',
+                    anchor: 'center',
                     formatter: (value, context) => context.dataset.customLabel
                 }
             }
@@ -157,100 +281,18 @@ function initChart() {
     });
 }
 
-function processRawData() {
-    const lines = document.getElementById('dataInput').value.trim().split('\n');
-    allData = [];
-    const tbody = document.getElementById('tableBody');
-    tbody.innerHTML = '';
-    lines.forEach((line, i) => {
-        const [d, p] = line.trim().split(/\s+/).map(Number);
-        if(!isNaN(d) && !isNaN(p)) {
-            allData.push({ d, p, selected: false });
-            const row = tbody.insertRow();
-            row.innerHTML = `<td><input type="checkbox" id="check-${i}" onchange="togglePoint(${i})"></td><td>${d}</td><td>${p}</td>`;
-            row.onclick = (e) => { if(e.target.type!=='checkbox') document.getElementById(`check-${i}`).click(); };
-        }
-    });
-    updateChart();
+function resetZoom() {
+    if (chart) chart.resetZoom();
 }
 
-function togglePoint(i) { allData[i].selected = !allData[i].selected; updateChart(); }
-function updateChart() {
-    chart.data.datasets[0].data = allData.filter(p=>!p.selected).map(p=>({x:p.p, y:p.d}));
-    chart.data.datasets[1].data = allData.filter(p=>p.selected).map(p=>({x:p.p, y:p.d}));
-    chart.update();
-}
-
-// --- JAVASCRIPT CALCULATION (Replaces PHP) ---
-function calculateLocally() {
-    const selected = allData.filter(p => p.selected);
-    if (selected.length < 2) return alert("Select at least 2 points.");
-    
-    // Linear Regression (Least Squares)
-    const n = selected.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-    
-    selected.forEach(pt => {
-        // x = Depth (Independent), y = Pressure (Dependent) for Gradient Calculation
-        // Wait! In regression, Gradient is Delta P / Delta D. 
-        // So Depth is X, Pressure is Y.
-        sumX += pt.d; 
-        sumY += pt.p;
-        sumXY += (pt.d * pt.p);
-        sumXX += (pt.d * pt.d);
-    });
-
-    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    const intercept = (sumY - slope * sumX) / n;
-    const density = (slope / 1.4223).toFixed(3); // Conversion
-
-    // Plotting Logic
-    const color = `hsl(${Math.random()*360}, 75%, 45%)`;
-    const label = document.getElementById('lineLabel').value || `Zone ${savedLines.length+1}`;
-    const cycles = parseFloat(document.getElementById('extCycles').value) || 1.0;
-    
-    const minD = Math.min(...selected.map(p=>p.d));
-    const maxD = Math.max(...selected.map(p=>p.d));
-    const pad = (maxD - minD) * cycles;
-
-    chart.data.datasets.push({
-        label: label,
-        customLabel: `${density} g/cc`,
-        data: [
-            { y: minD - pad, x: (slope * (minD - pad)) + intercept },
-            { y: (minD+maxD)/2, x: (slope * (minD+maxD)/2) + intercept },
-            { y: maxD + pad, x: (slope * (maxD + pad)) + intercept }
-        ],
-        type: 'line', borderColor: color, borderWidth: 2.5, borderDash: [6,4], fill: false, pointRadius: 0
-    });
-
-    savedLines.push({label, density, color});
-    renderLegend();
-    chart.update();
-    
-    // Clear selection
-    allData.forEach((p,i) => { p.selected=false; document.getElementById(`check-${i}`).checked=false; });
-    updateChart();
-}
-
-function renderLegend() {
-    document.getElementById('lineList').innerHTML = savedLines.map((l,i) => `
-        <div class="gradient-item" style="border-left-color:${l.color}">
-            <span><strong>${l.label}</strong>: ${l.density} g/cc</span>
-            <i class="bi bi-trash btn-delete" onclick="deleteLine(${i})"></i>
-        </div>`).join('');
-}
-
-function deleteLine(i) {
-    chart.data.datasets.splice(i+2, 1);
-    savedLines.splice(i, 1);
-    renderLegend();
+function toggleLabels() {
+    // When checkbox changes, re-render chart to hide/show labels
     chart.update();
 }
 
 function savePlotImage() {
     const link = document.createElement('a');
-    link.download = 'Field_Pressure_View.png';
+    link.download = 'Formation_Pressure_Plot.png';
     link.href = chart.toBase64Image('image/png', 1.0);
     link.click();
 }
@@ -262,7 +304,112 @@ function updateAxes() {
     chart.options.scales.y.max = parseFloat(document.getElementById('yMax').value) || null;
     chart.update();
 }
-function resetZoom() { if(chart) chart.resetZoom(); }
+
+function processRawData() {
+    const lines = document.getElementById('dataInput').value.trim().split('\n');
+    allData = [];
+    const tableBody = document.getElementById('tableBody');
+    tableBody.innerHTML = '';
+
+    lines.forEach((line, index) => {
+        const [d, p] = line.trim().split(/\s+/).map(Number);
+        if(!isNaN(d) && !isNaN(p)) {
+            allData.push({ d, p, selected: false });
+            const row = tableBody.insertRow();
+            row.id = `row-${index}`;
+            row.className = "cursor-pointer";
+            row.innerHTML = `<td><input type="checkbox" id="check-${index}" onchange="togglePoint(${index})"></td><td>${d}</td><td>${p}</td>`;
+            row.onclick = (e) => { if(e.target.type !== 'checkbox') document.getElementById(`check-${index}`).click(); };
+        }
+    });
+    updateChartPoints();
+}
+
+function togglePoint(index) {
+    allData[index].selected = !allData[index].selected;
+    document.getElementById(`row-${index}`).classList.toggle('selected-row');
+    updateChartPoints();
+}
+
+function updateChartPoints() {
+    chart.data.datasets[0].data = allData.filter(pt => !pt.selected).map(pt => ({ x: pt.p, y: pt.d }));
+    chart.data.datasets[1].data = allData.filter(pt => pt.selected).map(pt => ({ x: pt.p, y: pt.d }));
+    chart.update();
+}
+
+async function calculateAndSave() {
+    const selected = allData.filter(pt => pt.selected);
+    if (selected.length < 2) return alert("Select at least 2 points.");
+    
+    const depths = selected.map(pt => pt.d);
+    const pressures = selected.map(pt => pt.p);
+    const labelInput = document.getElementById('lineLabel').value || `Fluid Zone ${savedLines.length + 1}`;
+    const cycles = parseFloat(document.getElementById('extCycles').value) || 1.0;
+
+    const res = await fetch('calculate.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ depths, pressures })
+    }).then(r => r.json());
+
+    const color = `hsl(${Math.random() * 360}, 75%, 45%)`;
+    const minD = Math.min(...depths);
+    const maxD = Math.max(...depths);
+    const padding = (maxD - minD) * cycles; 
+
+    chart.data.datasets.push({
+        label: labelInput,
+        // --- THIS IS THE FIX ---
+        customLabel: `${res.density} g/cc`, 
+        // -----------------------
+        data: [
+            { y: minD - padding, x: (res.gradient * (minD - padding)) + res.intercept },
+            { y: (minD + maxD)/2, x: (res.gradient * (minD + maxD)/2) + res.intercept },
+            { y: maxD + padding, x: (res.gradient * (maxD + padding)) + res.intercept }
+        ],
+        type: 'line', 
+        borderColor: color, 
+        borderWidth: 2.5, 
+        borderDash: [6, 4], 
+        fill: false, 
+        pointRadius: 0 
+    });
+
+    savedLines.push({ label: labelInput, density: res.density, color: color });
+    renderLineList();
+    chart.update();
+    clearSelection();
+}
+
+function renderLineList() {
+    document.getElementById('lineList').innerHTML = savedLines.map((line, i) => `
+        <div class="gradient-item shadow-sm" style="border-left-color: ${line.color}">
+            <div class="d-flex flex-column">
+                <span class="fw-bold text-dark">${line.label}</span>
+                <span class="small text-muted">${line.density} g/cc</span>
+            </div>
+            <i class="bi bi-trash btn-delete" onclick="deleteLine(${i})" title="Delete Line"></i>
+        </div>
+    `).join('');
+}
+
+function deleteLine(index) {
+    chart.data.datasets.splice(index + 2, 1);
+    savedLines.splice(index, 1);
+    renderLineList();
+    chart.update();
+}
+
+function clearSelection() {
+    allData.forEach((pt, i) => { 
+        pt.selected = false; 
+        const cb = document.getElementById(`check-${i}`);
+        if(cb) cb.checked = false;
+        const row = document.getElementById(`row-${i}`);
+        if(row) row.classList.remove('selected-row');
+    });
+    updateChartPoints();
+}
 
 initChart();
 </script>
