@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Excess Pressure Pro | Alton Brown Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    
+    <style>
+        :root { --geo-dark: #1a252f; --geo-blue: #3498db; }
+        body { background: #fdfdfd; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+        
+        /* Layout */
+        .sidebar { height: calc(100vh - 56px); overflow-y: auto; background: white; border-right: 1px solid #ddd; padding: 15px; }
+        .main-content { height: calc(100vh - 56px); padding: 15px; background: #f4f7f6; }
+        .chart-card { height: 100%; background: white; border-radius: 8px; border: 1px solid #ccc; padding: 10px; position: relative; }
+        
+        /* UI Elements */
+        .navbar { background: var(--geo-dark); }
+        .nav-link { color: rgba(255,255,255,0.8) !important; font-size: 0.9rem; cursor: pointer; }
+        .nav-link:hover { color: #fff !important; }
+        .table-wrapper { max-height: 160px; overflow-y: auto; font-size: 0.75rem; border: 1px solid #eee; }
+        .selected-row { background-color: #ffeb3b !important; font-weight: bold; }
+        .scale-input { width: 48%; display: inline-block; font-size: 0.75rem; }
+        .gradient-item { border-left: 5px solid; padding: 8px 10px; margin-bottom: 5px; background: #f8f9fa; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark px-3 shadow-sm">
+    <a class="navbar-brand fw-bold" href="#"><i class="bi bi-graph-up-arrow"></i> Excess Pressure Pro</a>
+    <div class="collapse navbar-collapse justify-content-end">
+        <ul class="navbar-nav">
+            <li class="nav-item" onclick="new bootstrap.Modal(document.getElementById('helpModal')).show()">
+                <a class="nav-link"><i class="bi bi-question-circle"></i> User Manual</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link text-warning fw-bold" href="index.html" target="_blank"><i class="bi bi-file-earmark-text"></i> Back to Pressure Plot</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3 sidebar">
+            <div class="card mb-2 p-2 shadow-sm border-0 bg-light">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <label class="fw-bold small text-muted">PLOT CONTROL</label>
+                    <button class="btn btn-outline-secondary btn-sm py-0" style="font-size: 0.7rem;" onclick="resetZoom()">Reset Zoom</button>
+                </div>
+                <div class="mb-1">
+                    <input type="number" id="xMin" class="form-control form-control-sm scale-input" placeholder="Pressure Min" onchange="updateAxes()">
+                    <input type="number" id="xMax" class="form-control form-control-sm scale-input" placeholder="Pressure Max" onchange="updateAxes()">
+                </div>
+                <div>
+                    <input type="number" id="yMin" class="form-control form-control-sm scale-input" placeholder="Depth Min" onchange="updateAxes()">
+                    <input type="number" id="yMax" class="form-control form-control-sm scale-input" placeholder="Depth Max" onchange="updateAxes()">
+                </div>
+            </div>
+
+            <div class="card mb-2 p-2 shadow-sm border-0">
+                <textarea id="dataInput" class="form-control form-control-sm mb-1" rows="2" placeholder="Paste Depth(m) & Press(psi)..."></textarea>
+                <button onclick="processRawData()" class="btn btn-dark btn-sm w-100">Load Data</button>
+            </div>
+
+            <div class="card mb-2 p-2 shadow-sm border-0">
+                <label class="fw-bold small text-muted">INTERPRETATION</label>
+                <div class="table-wrapper mb-2">
+                    <table class="table table-sm table-hover mb-0"><tbody id="tableBody"></tbody></table>
+                </div>
+                
+                <div class="p-2 rounded border bg-light mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="fw-bold">Ref Density:</small>
+                        <input type="number" id="densInput" class="form-control form-control-sm" style="width:70px" step="0.001" value="1.000" oninput="syncSlider(this.value)">
+                    </div>
+                    <input type="range" id="densSlider" class="form-range" min="0" max="1.5" step="0.001" value="1.000" oninput="syncInput(this.value)">
+                </div>
+
+                <div class="row g-1 mb-2">
+                    <div class="col-6">
+                        <input type="number" id="extCycles" class="form-control form-control-sm" placeholder="Cycles" value="2.0" step="0.5">
+                    </div>
+                    <div class="col-6">
+                        <input type="text" id="lineLabel" class="form-control form-control-sm" placeholder="Zone Name">
+                    </div>
+                </div>
+                <button onclick="saveZoneGradient()" class="btn btn-primary btn-sm w-100">Draw Extended Line</button>
+            </div>
+
+            <div class="card p-2 shadow-sm border-0">
+                <label class="fw-bold small text-muted">SAVED ZONES</label>
+                <div id="lineList" class="mt-1"></div>
+            </div>
+        </div>
+
+        <div class="col-md-9 main-content">
+            <div class="chart-card shadow-sm d-flex flex-column">
+                <div class="d-flex justify-content-end mb-2">
+                    <button onclick="savePlotImage()" class="btn btn-outline-dark btn-sm"><i class="bi bi-camera"></i> Save Plot Image</button>
+                </div>
+                <div style="flex-grow: 1; position: relative;">
+                    <canvas id="excessChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="helpModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">📖 User Manual: How to Use Excess Pressure Pro</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>1. Overview</h6>
+                <p class="small text-muted">
+                    This tool uses the <strong>Alton Brown "Excess Pressure" method</strong> to remove the hydrostatic gradient from your pressure data. This allows you to visualize fluid density changes, compartments, and contacts with high precision.
+                    
+                </p>
+                <hr>
+                <h6>2. Loading Data</h6>
+                <ul>
+                    <li>Prepare your data in Excel: Column A = <strong>Depth (m)</strong>, Column B = <strong>Pressure (psi)</strong>.</li>
+                    <li>Copy both columns (without headers).</li>
+                    <li>Paste them into the <strong>"Paste Depth(m) & Press(psi)..."</strong> box in the sidebar.</li>
+                    <li>Click <strong>"Load Data"</strong>.</li>
+                </ul>
+                <hr>
+                <h6>3. Defining Zones & Calculating Density</h6>
+                <ol>
+                    <li>In the "Zone Definition" table, select the points belonging to a specific fluid leg (e.g., Water Zone).</li>
+                    <li>Adjust the <strong>Ref Density Slider</strong> until the selected points form a <strong>Vertical Line</strong> on the chart.</li>
+                    <li>Alternatively, type the known density (e.g., 1.03) into the input box.</li>
+                    <li>Enter a name (e.g., "Water Leg") and click <strong>"Draw Extended Line"</strong>.</li>
+                    <li>The app calculates the exact density and projects a dashed line.</li>
+                </ol>
+                <hr>
+                <h6>4. Finding Fluid Contacts</h6>
+                <p class="small">
+                    Repeat Step 3 for the Oil Zone. Adjust the density until the oil points are vertical (usually around 0.6-0.8 g/cc).
+                    The intersection of the extended Water Line and Oil Line represents the <strong>Free Water Level (FWL)</strong>.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let chart;
+let allData = [];
+let savedLines = [];
+
+const whiteBackgroundPlugin = {
+    id: 'customCanvasBackgroundColor',
+    beforeDraw: (chart, args, options) => {
+        const {ctx} = chart;
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.fillStyle = options.color || '#ffffff';
+        ctx.fillRect(0, 0, chart.width, chart.height);
+        ctx.restore();
+    }
+};
+
+function initChart() {
+    const ctx = document.getElementById('excessChart').getContext('2d');
+    chart = new Chart(ctx, {
+        type: 'scatter',
+        data: {
+            datasets: [
+                { label: 'All Points', data: [], backgroundColor: '#000', pointRadius: 4 },
+                { label: 'Selection', data: [], backgroundColor: '#f1c40f', pointRadius: 6, borderColor: '#000', borderWidth: 1 }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { title: { display: true, text: 'Excess Pressure [psi]' }, position: 'top', grid: { color: '#f0f0f0' } },
+                y: { reverse: true, title: { display: true, text: 'Depth (m)' }, grid: { color: '#f0f0f0' } }
+            },
+            plugins: {
+                legend: { display: false },
+                customCanvasBackgroundColor: { color: '#ffffff' },
+                zoom: {
+                    pan: { enabled: true, mode: 'xy', modifierKey: 'ctrl' },
+                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+                }
+            }
+        },
+        plugins: [whiteBackgroundPlugin]
+    });
+}
+
+function resetZoom() { chart.resetZoom(); }
+
+function savePlotImage() {
+    const link = document.createElement('a');
+    link.download = 'Excess_Pressure_Plot.png';
+    link.href = chart.toBase64Image('image/png', 1.0);
+    link.click();
+}
+
+function syncSlider(val) { document.getElementById('densSlider').value = val; updateExcessCalculation(); }
+function syncInput(val) { document.getElementById('densInput').value = val; updateExcessCalculation(); }
+
+function processRawData() {
+    const lines = document.getElementById('dataInput').value.trim().split('\n');
+    allData = [];
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    lines.forEach((line, i) => {
+        const [d, p] = line.trim().split(/\s+/).map(Number);
+        if(!isNaN(d) && !isNaN(p)) {
+            allData.push({ d, p, selected: false });
+            const row = tbody.insertRow();
+            row.id = `row-${i}`;
+            row.innerHTML = `<td><input type="checkbox" id="check-${i}" onchange="togglePoint(${i})"></td><td>${d}m</td><td>${p}psi</td>`;
+            row.onclick = (e) => { if(e.target.type !== 'checkbox') document.getElementById(`check-${i}`).click(); };
+        }
+    });
+    updateExcessCalculation();
+}
+
+function togglePoint(i) {
+    allData[i].selected = !allData[i].selected;
+    document.getElementById(`row-${i}`).classList.toggle('selected-row');
+    updateExcessCalculation();
+}
+
+// ==========================================================
+// CLIENT-SIDE CALCULATION (previously excess_calc.php)
+// Alton Brown "excess pressure" method:
+//   excessP = P_observed - (refDensity * 1.422 * depth)
+//   actualDensity = refDensity + (regressionSlope / 1.422)
+// Runs entirely in the browser -> works on GitHub Pages / any static host.
+// ==========================================================
+function calculateExcessLocal(depths, pressures, refDensity) {
+    const psiPerMeterPerGcc = 1.422;
+    const n = depths.length;
+
+    const excessPressures = depths.map((d, i) =>
+        Math.round((pressures[i] - (refDensity * psiPerMeterPerGcc * d)) * 1000) / 1000
+    );
+
+    const result = { excessPressures };
+
+    if (n >= 2) {
+        const sumX = depths.reduce((a, b) => a + b, 0);
+        const sumY = excessPressures.reduce((a, b) => a + b, 0);
+        let sumXX = 0, sumXY = 0;
+        for (let i = 0; i < n; i++) {
+            sumXX += depths[i] * depths[i];
+            sumXY += depths[i] * excessPressures[i];
+        }
+        const denom = (n * sumXX - sumX * sumX);
+        const slope = denom !== 0 ? (n * sumXY - sumX * sumY) / denom : 0;
+        const intercept = (sumY - slope * sumX) / n;
+        const actualDensity = refDensity + (slope / psiPerMeterPerGcc);
+
+        result.slope = Math.round(slope * 10000) / 10000;
+        result.intercept = Math.round(intercept * 1000) / 1000;
+        result.actualDensity = Math.round(actualDensity * 1000) / 1000;
+    }
+
+    return result;
+}
+
+function updateExcessCalculation() {
+    if(allData.length === 0) return;
+    const refDens = parseFloat(document.getElementById('densInput').value);
+    const depths = allData.map(pt => pt.d);
+    const pressures = allData.map(pt => pt.p);
+
+    const res = calculateExcessLocal(depths, pressures, refDens);
+
+    allData.forEach((pt, i) => pt.excess = res.excessPressures[i]);
+
+    chart.data.datasets[0].data = allData.filter(pt => !pt.selected).map(pt => ({ x: pt.excess, y: pt.d }));
+    chart.data.datasets[1].data = allData.filter(pt => pt.selected).map(pt => ({ x: pt.excess, y: pt.d }));
+    chart.update('none');
+}
+
+function saveZoneGradient() {
+    const sel = allData.filter(pt => pt.selected);
+    if(sel.length < 2) return alert("Select at least 2 points.");
+    
+    const label = document.getElementById('lineLabel').value || "Dens";
+    const refDens = parseFloat(document.getElementById('densInput').value);
+    const cycles = parseFloat(document.getElementById('extCycles').value) || 1.0;
+    const depths = sel.map(p => p.d);
+    const pressures = sel.map(p => p.p);
+
+    const res = calculateExcessLocal(depths, pressures, refDens);
+
+    const color = `hsl(${Math.random() * 360}, 65%, 45%)`;
+    const minD = Math.min(...depths);
+    const maxD = Math.max(...depths);
+    const pad = (maxD - minD) * cycles; 
+
+    chart.data.datasets.push({
+        label: label,
+        data: [
+            { y: minD - pad, x: (res.slope * (minD - pad)) + res.intercept },
+            { y: maxD + pad, x: (res.slope * (maxD + pad)) + res.intercept }
+        ],
+        type: 'line', borderColor: color, borderWidth: 2, borderDash: [6, 4], fill: false, pointRadius: 0
+    });
+
+    savedLines.push({ label, density: res.actualDensity, color });
+    renderLineList();
+    chart.update();
+}
+
+function renderLineList() {
+    document.getElementById('lineList').innerHTML = savedLines.map((l, i) => `
+        <div class="gradient-item" style="border-left-color: ${l.color}">
+            <div class="d-flex flex-column">
+                <span class="fw-bold text-dark">${l.label}</span>
+                <span class="text-muted small">${l.density} g/cc</span>
+            </div>
+            <i class="bi bi-x-circle text-danger fs-5 cursor-pointer" onclick="deleteLine(${i})"></i>
+        </div>`).join('');
+}
+
+function deleteLine(i) {
+    chart.data.datasets.splice(i + 2, 1);
+    savedLines.splice(i, 1);
+    renderLineList();
+    chart.update();
+}
+
+function updateAxes() {
+    chart.options.scales.x.min = parseFloat(document.getElementById('xMin').value) || null;
+    chart.options.scales.x.max = parseFloat(document.getElementById('xMax').value) || null;
+    chart.options.scales.y.min = parseFloat(document.getElementById('yMin').value) || null;
+    chart.options.scales.y.max = parseFloat(document.getElementById('yMax').value) || null;
+    chart.update();
+}
+
+initChart();
+</script>
+</body>
+</html>

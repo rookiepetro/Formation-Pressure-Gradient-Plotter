@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GeoPressure Field View | Multi-Well</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    
+    <style>
+        :root { --geo-dark: #2c3e50; --geo-field: #27ae60; }
+        body { background: #fdfdfd; font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; }
+        .sidebar { height: calc(100vh - 56px); overflow-y: auto; background: white; border-right: 1px solid #ddd; padding: 15px; }
+        .main-content { height: calc(100vh - 56px); padding: 15px; background: #f4f7f6; }
+        .chart-card { height: 100%; background: white; border-radius: 8px; border: 1px solid #ccc; padding: 10px; position: relative; }
+        .navbar { background: var(--geo-dark); }
+        .nav-link:hover { color: #fff !important; }
+        .data-table-wrapper { max-height: 250px; overflow-y: auto; font-size: 0.75rem; border: 1px solid #ddd; }
+        .scale-input { width: 48%; display: inline-block; font-size: 0.75rem; }
+        .well-badge { font-size: 0.7rem; padding: 2px 6px; border-radius: 4px; color: white; font-weight: bold; margin-right: 5px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark px-3 shadow-sm">
+    <a class="navbar-brand fw-bold" href="#"><i class="bi bi-layers-half"></i> GeoPressure Field View</a>
+    <div class="collapse navbar-collapse justify-content-end">
+        <ul class="navbar-nav">
+            <li class="nav-item me-3">
+                <a class="nav-link text-warning fw-bold" href="index.html" target="_blank"><i class="bi bi-arrow-left-circle"></i> Back to Single Well</a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link btn btn-outline-light btn-sm px-3 py-1" data-bs-toggle="modal" data-bs-target="#helpModal">
+                    <i class="bi bi-book"></i> Manual
+                </a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-3 sidebar">
+            
+            <div class="card shadow-sm mb-3 border-0 bg-light">
+                <div class="card-body p-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="fw-bold small text-muted mb-0">FIELD SCALE</label>
+                        <button class="btn btn-outline-secondary btn-sm py-0" style="font-size: 0.7rem;" onclick="resetZoom()">Reset Zoom</button>
+                    </div>
+                    <div class="mb-1">
+                        <input type="number" id="xMin" class="form-control form-control-sm scale-input" placeholder="Press Min" onchange="updateAxes()">
+                        <input type="number" id="xMax" class="form-control form-control-sm scale-input" placeholder="Press Max" onchange="updateAxes()">
+                    </div>
+                    <div>
+                        <input type="number" id="yMin" class="form-control form-control-sm scale-input" placeholder="Depth Min" onchange="updateAxes()">
+                        <input type="number" id="yMax" class="form-control form-control-sm scale-input" placeholder="Depth Max" onchange="updateAxes()">
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3 border-0">
+                <div class="card-body p-2">
+                    <label class="fw-bold small text-muted">1. ADD WELL DATA</label>
+                    <input type="text" id="wellNameInput" class="form-control form-control-sm mb-2 fw-bold" placeholder="Well Name (e.g. Well-A)">
+                    <textarea id="dataInput" class="form-control form-control-sm mb-2" rows="2" placeholder="Paste: Depth(m) Pressure(psi)"></textarea>
+                    <button onclick="addWellData()" class="btn btn-success btn-sm w-100"><i class="bi bi-plus-lg"></i> Add Well to Plot</button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm mb-3 border-0">
+                <div class="card-body p-2">
+                    <label class="fw-bold small text-muted">2. FIELD ANALYSIS</label>
+                    <div class="data-table-wrapper mb-2 mt-1">
+                        <table class="table table-sm table-hover mb-0" id="pointsTable">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width:20px"><input type="checkbox" onclick="toggleAll(this)"></th>
+                                    <th>Well</th>
+                                    <th>Depth</th>
+                                    <th>Press</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tableBody"></tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <input type="number" id="extCycles" class="form-control form-control-sm" value="2.0" step="0.5" placeholder="Cycles">
+                        </div>
+                        <div class="col-6">
+                            <input type="text" id="lineLabel" class="form-control form-control-sm" placeholder="Zone Name">
+                        </div>
+                    </div>
+                    
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="showLabelsCheck" checked onchange="chart.update()">
+                        <label class="form-check-label small text-muted">Show Density Labels</label>
+                    </div>
+
+                    <button onclick="calculateGradient()" class="btn btn-primary btn-sm w-100">Draw Field Gradient</button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-2">
+                    <label class="fw-bold small text-muted">INTERPRETATION</label>
+                    <div id="lineList" class="mt-2"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-9 main-content">
+            <div class="chart-card shadow-sm d-flex flex-column">
+                <div class="d-flex justify-content-end mb-2">
+                    <button onclick="savePlotImage()" class="btn btn-outline-dark btn-sm"><i class="bi bi-camera"></i> Save Field Plot</button>
+                </div>
+                <div style="flex-grow: 1; position: relative;">
+                    <canvas id="fieldChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="helpModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">📖 Field View Manual</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6>How to perform Multi-Well Analysis</h6>
+                <ol>
+                    <li><strong>Enter Name:</strong> Type "Well-1" in the Well Name box.</li>
+                    <li><strong>Paste Data:</strong> Paste Depth & Pressure for Well-1. Click <strong>Add Well</strong>. (It appears in a specific color).</li>
+                    <li><strong>Repeat:</strong> Type "Well-2", paste data, click Add. (It appears in a DIFFERENT color).</li>
+                    <li><strong>Compare:</strong> Visually check if points from Well-1 and Well-2 align.</li>
+                    <li><strong>Draw Gradient:</strong> Select points from ANY well in the table to draw a gradient line. This helps identify if different wells share the same aquifer or hydrocarbon leg.</li>
+                </ol>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+Chart.register(ChartDataLabels);
+
+let chart;
+let globalData = []; // Stores all points from all wells
+let savedLines = [];
+let wellColors = ['#e74c3c', '#3498db', '#9b59b6', '#2ecc71', '#f39c12', '#34495e']; // Auto colors for wells
+
+const whiteBgPlugin = {
+    id: 'customCanvasBackgroundColor',
+    beforeDraw: (chart) => {
+        const ctx = chart.ctx;
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, chart.width, chart.height);
+        ctx.restore();
+    }
+};
+
+function initChart() {
+    const ctx = document.getElementById('fieldChart').getContext('2d');
+    chart = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets: [] }, // Starts empty
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            scales: {
+                x: { title: { display: true, text: 'Pressure (psi)' }, position: 'top', grid: { color: '#eee' } },
+                y: { reverse: true, title: { display: true, text: 'Depth (m TVD)' }, grid: { color: '#eee' } }
+            },
+            plugins: {
+                legend: { position: 'bottom' },
+                zoom: {
+                    pan: { enabled: true, modifierKey: 'ctrl' },
+                    zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
+                },
+                datalabels: {
+                    display: function(context) {
+                        return document.getElementById('showLabelsCheck').checked && context.dataset.type === 'line' && context.dataIndex === 1;
+                    },
+                    backgroundColor: null, borderRadius: 0, borderWidth: 0,
+                    color: (ctx) => ctx.dataset.borderColor,
+                    font: { weight: 'bold', size: 12 }, align: 'top', offset: 10, anchor: 'center',
+                    formatter: (value, context) => context.dataset.customLabel
+                }
+            }
+        },
+        plugins: [whiteBgPlugin]
+    });
+}
+
+function addWellData() {
+    const name = document.getElementById('wellNameInput').value || `Well-${chart.data.datasets.filter(d => d.type!=='line').length + 1}`;
+    const raw = document.getElementById('dataInput').value.trim();
+    if (!raw) return alert("Paste data first");
+
+    const color = wellColors[chart.data.datasets.filter(d => d.type!=='line').length % wellColors.length];
+    const points = [];
+
+    raw.split('\n').forEach(line => {
+        const [d, p] = line.trim().split(/\s+/).map(Number);
+        if (!isNaN(d) && !isNaN(p)) {
+            points.push({ x: p, y: d });
+            // Add to global buffer for table
+            globalData.push({ x: p, y: d, well: name, color: color, selected: false });
+        }
+    });
+
+    // Add Visual Dataset
+    chart.data.datasets.push({
+        label: name,
+        data: points,
+        backgroundColor: color,
+        pointRadius: 5,
+        datalabels: { display: false } // Don't label dots
+    });
+
+    chart.update();
+    renderTable();
+    document.getElementById('dataInput').value = ''; // Clear input for next well
+}
+
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+    
+    // Sort by depth for easier viewing
+    const sorted = globalData.map((pt, i) => ({...pt, originalIndex: i})).sort((a,b) => a.y - b.y);
+
+    sorted.forEach(pt => {
+        const row = tbody.insertRow();
+        row.className = pt.selected ? 'selected-row' : '';
+        row.innerHTML = `
+            <td><input type="checkbox" ${pt.selected ? 'checked' : ''} onchange="toggleSelection(${pt.originalIndex})"></td>
+            <td><span class="well-badge" style="background:${pt.color}">${pt.well}</span></td>
+            <td>${pt.y}</td>
+            <td>${pt.x}</td>
+        `;
+    });
+}
+
+function toggleSelection(index) {
+    globalData[index].selected = !globalData[index].selected;
+    renderTable();
+    // We don't need to update visual chart selection state here for multi-well, 
+    // simply tracking it for calculation is enough.
+}
+
+function toggleAll(source) {
+    globalData.forEach(pt => pt.selected = source.checked);
+    renderTable();
+}
+
+// ==========================================================
+// CLIENT-SIDE CALCULATION (previously calculate.php)
+// Same math as index.html's local calculation, kept identical
+// so multi-well gradients match single-well ones.
+// ==========================================================
+function calculateGradientLocal(depths, pressures) {
+    const n = depths.length;
+    const sumX = depths.reduce((a, b) => a + b, 0);
+    const sumY = pressures.reduce((a, b) => a + b, 0);
+    let sumXX = 0, sumXY = 0;
+    for (let i = 0; i < n; i++) {
+        sumXX += depths[i] * depths[i];
+        sumXY += depths[i] * pressures[i];
+    }
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    const density = slope / 1.422;
+
+    return {
+        gradient: Math.round(slope * 10000) / 10000,
+        density: Math.round(density * 1000) / 1000,
+        intercept: intercept
+    };
+}
+
+function calculateGradient() {
+    const selected = globalData.filter(pt => pt.selected);
+    if (selected.length < 2) return alert("Select at least 2 points (can be from different wells).");
+
+    const depths = selected.map(pt => pt.y);
+    const pressures = selected.map(pt => pt.x);
+    const label = document.getElementById('lineLabel').value || `Grad-${savedLines.length+1}`;
+    const cycles = parseFloat(document.getElementById('extCycles').value) || 1.0;
+
+    const res = calculateGradientLocal(depths, pressures);
+
+    const minD = Math.min(...depths);
+    const maxD = Math.max(...depths);
+    const pad = (maxD - minD) * cycles;
+    const color = '#34495e'; // Dark color for interpreted lines
+
+    chart.data.datasets.push({
+        label: label,
+        customLabel: `${res.density} g/cc`,
+        data: [
+            { y: minD - pad, x: (res.gradient * (minD - pad)) + res.intercept },
+            { y: (minD + maxD)/2, x: (res.gradient * (minD + maxD)/2) + res.intercept },
+            { y: maxD + pad, x: (res.gradient * (maxD + pad)) + res.intercept }
+        ],
+        type: 'line', borderColor: color, borderWidth: 3, borderDash: [8, 4], fill: false, pointRadius: 0
+    });
+
+    savedLines.push({ label, density: res.density, color });
+    renderLegend();
+    chart.update();
+    
+    // Uncheck all after drawing
+    globalData.forEach(pt => pt.selected = false);
+    renderTable();
+}
+
+function renderLegend() {
+    document.getElementById('lineList').innerHTML = savedLines.map((l, i) => `
+        <div class="gradient-item">
+            <span><strong>${l.label}</strong>: ${l.density} g/cc</span>
+            <i class="bi bi-trash btn-delete" onclick="deleteLine(${i})"></i>
+        </div>`).join('');
+}
+
+function deleteLine(i) {
+    // Find the dataset index corresponding to this gradient line
+    // Datasets are: [Well1, Well2, ... Line1, Line2 ...]
+    // We need to carefully splice.
+    // Simple approach: Filtering datasets
+    const dsIndex = chart.data.datasets.findIndex(ds => ds.label === savedLines[i].label && ds.type === 'line');
+    if(dsIndex > -1) chart.data.datasets.splice(dsIndex, 1);
+    
+    savedLines.splice(i, 1);
+    renderLegend();
+    chart.update();
+}
+
+function savePlotImage() {
+    const link = document.createElement('a');
+    link.download = 'Field_Pressure_View.png';
+    link.href = chart.toBase64Image('image/png', 1.0);
+    link.click();
+}
+
+function updateAxes() {
+    chart.options.scales.x.min = parseFloat(document.getElementById('xMin').value) || null;
+    chart.options.scales.x.max = parseFloat(document.getElementById('xMax').value) || null;
+    chart.options.scales.y.min = parseFloat(document.getElementById('yMin').value) || null;
+    chart.options.scales.y.max = parseFloat(document.getElementById('yMax').value) || null;
+    chart.update();
+}
+
+function resetZoom() { if(chart) chart.resetZoom(); }
+
+initChart();
+</script>
+</body>
+</html>
