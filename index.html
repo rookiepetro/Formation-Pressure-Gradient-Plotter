@@ -39,10 +39,10 @@
     <div class="collapse navbar-collapse justify-content-end">
         <ul class="navbar-nav align-items-center">
             <li class="nav-item me-3">
-                <a class="nav-link text-warning fw-bold" href="dfts_excess.php" target="_blank"><i class="bi bi-speedometer2"></i> Switch to Excess Pressure</a>
+                <a class="nav-link text-warning fw-bold" href="dfts_excess.html" target="_blank"><i class="bi bi-speedometer2"></i> Switch to Excess Pressure</a>
             </li>
 			<li class="nav-item me-3">
-                <a class="nav-link text-warning fw-bold" href="dfts_multi.php"target="_blank"><i class="bi bi-speedometer2"></i> Multi Well Pressure</a>
+                <a class="nav-link text-warning fw-bold" href="dfts_multi.html" target="_blank"><i class="bi bi-speedometer2"></i> Multi Well Pressure</a>
             </li>
 			
             <li class="nav-item">
@@ -337,7 +337,33 @@ function updateChartPoints() {
     chart.update();
 }
 
-async function calculateAndSave() {
+// ==========================================================
+// CLIENT-SIDE CALCULATION (previously calculate.php)
+// Least-squares linear regression: Pressure = slope*Depth + intercept
+// Fluid Density (g/cc) = gradient (psi/m) / 1.422
+// Runs entirely in the browser -> works on GitHub Pages / any static host.
+// ==========================================================
+function calculateGradientLocal(depths, pressures) {
+    const n = depths.length;
+    const sumX = depths.reduce((a, b) => a + b, 0);
+    const sumY = pressures.reduce((a, b) => a + b, 0);
+    let sumXX = 0, sumXY = 0;
+    for (let i = 0; i < n; i++) {
+        sumXX += depths[i] * depths[i];
+        sumXY += depths[i] * pressures[i];
+    }
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    const intercept = (sumY - slope * sumX) / n;
+    const density = slope / 1.422;
+
+    return {
+        gradient: Math.round(slope * 10000) / 10000,
+        density: Math.round(density * 1000) / 1000,
+        intercept: intercept
+    };
+}
+
+function calculateAndSave() {
     const selected = allData.filter(pt => pt.selected);
     if (selected.length < 2) return alert("Select at least 2 points.");
     
@@ -346,11 +372,7 @@ async function calculateAndSave() {
     const labelInput = document.getElementById('lineLabel').value || `Fluid Zone ${savedLines.length + 1}`;
     const cycles = parseFloat(document.getElementById('extCycles').value) || 1.0;
 
-    const res = await fetch('calculate.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ depths, pressures })
-    }).then(r => r.json());
+    const res = calculateGradientLocal(depths, pressures);
 
     const color = `hsl(${Math.random() * 360}, 75%, 45%)`;
     const minD = Math.min(...depths);
@@ -359,9 +381,7 @@ async function calculateAndSave() {
 
     chart.data.datasets.push({
         label: labelInput,
-        // --- THIS IS THE FIX ---
         customLabel: `${res.density} g/cc`, 
-        // -----------------------
         data: [
             { y: minD - padding, x: (res.gradient * (minD - padding)) + res.intercept },
             { y: (minD + maxD)/2, x: (res.gradient * (minD + maxD)/2) + res.intercept },
