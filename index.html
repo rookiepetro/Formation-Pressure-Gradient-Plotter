@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
     <title>GeoPressure Pro | Formation Tester</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
@@ -30,13 +31,42 @@
         .btn-delete { color: #dc3545; cursor: pointer; font-size: 1.1rem; }
         .btn-delete:hover { color: #a71d2a; }
         .cursor-pointer { cursor: pointer; }
+
+        /* ============ RESPONSIVE: TABLET & PHONE ============ */
+        @media (max-width: 991.98px) {
+            body { overflow: auto; }
+            .container-fluid, .row { height: auto; }
+            .sidebar {
+                height: auto;
+                max-height: none;
+                border-right: none;
+                border-bottom: 1px solid #ddd;
+            }
+            .main-content {
+                height: 65vh;
+                min-height: 420px;
+                padding-top: 10px;
+            }
+            /* Prevent iOS Safari auto-zoom on input focus */
+            input, textarea, select { font-size: 16px !important; }
+            .scale-input { width: 48%; }
+        }
+        @media (max-width: 575.98px) {
+            .main-content { height: 55vh; min-height: 340px; }
+            .sidebar { padding: 10px; }
+            .navbar-brand { font-size: 1rem; }
+            .btn-sm { padding: 0.4rem 0.6rem; }
+        }
     </style>
 </head>
 <body>
 
 <nav class="navbar navbar-expand-lg navbar-dark px-3 shadow-sm">
     <a class="navbar-brand fw-bold" href="#"><i class="bi bi-graph-down"></i> Formation Tester Pro</a>
-    <div class="collapse navbar-collapse justify-content-end">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-controls="navMain" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse justify-content-end" id="navMain">
         <ul class="navbar-nav align-items-center">
             <li class="nav-item me-3">
                 <a class="nav-link text-warning fw-bold" href="dfts_excess.html" target="_blank"><i class="bi bi-speedometer2"></i> Switch to Excess Pressure</a>
