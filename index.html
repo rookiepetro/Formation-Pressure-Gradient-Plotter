@@ -17,8 +17,27 @@
     <style>
         :root { --geo-dark: #1a252f; --geo-accent: #3498db; }
         body { background: #fdfdfd; font-family: 'Segoe UI', Tahoma, sans-serif; overflow: hidden; }
-        .sidebar { height: calc(100vh - 56px); overflow-y: auto; background: white; border-right: 1px solid #ddd; padding: 15px; }
-        .main-content { height: calc(100vh - 56px); padding: 15px; background: #f4f7f6; }
+        .sidebar { height: calc(100vh - 56px - 90px); overflow-y: auto; background: white; border-right: 1px solid #ddd; padding: 15px; }
+        .main-content { height: calc(100vh - 56px - 90px); padding: 15px; background: #f4f7f6; }
+        .dev-footer {
+            position: fixed; left: 0; right: 0; bottom: 0; height: 90px; z-index: 1030;
+            background: var(--geo-dark); display: flex; align-items: center; padding: 0 24px;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        .dev-footer img, .dev-footer .avatar-fallback {
+            width: 64px; height: 64px; border-radius: 50%; object-fit: cover;
+            border: 2px solid var(--geo-accent); margin-right: 16px; flex-shrink: 0;
+        }
+        .dev-footer .avatar-fallback {
+            display: flex; align-items: center; justify-content: center;
+            background: var(--geo-accent); color: white; font-size: 1.6rem;
+        }
+        .dev-footer .dev-name { color: #fff; font-weight: 700; font-size: 1rem; margin: 0; line-height: 1.3; }
+        .dev-footer .dev-role { color: var(--geo-accent); font-size: 0.78rem; font-weight: 600; margin: 0; line-height: 1.4; }
+        .dev-footer .dev-bio { color: rgba(255,255,255,0.7); font-size: 0.76rem; margin: 2px 0 0; line-height: 1.35; max-width: 640px; }
+        .dev-footer .dev-links { margin-left: auto; display: flex; align-items: center; flex-shrink: 0; padding-left: 12px; }
+        .dev-footer a.dev-link { color: rgba(255,255,255,0.75); margin-left: 14px; font-size: 1.3rem; }
+        .dev-footer a.dev-link:hover { color: #fff; }
         .chart-card { height: 100%; background: white; border-radius: 8px; border: 1px solid #ccc; padding: 10px; position: relative; }
         .navbar { background: var(--geo-dark); }
         .nav-link { color: rgba(255,255,255,0.8) !important; font-size: 0.9rem; cursor: pointer; transition: 0.2s; }
@@ -34,7 +53,7 @@
 
         /* ============ RESPONSIVE: TABLET & PHONE ============ */
         @media (max-width: 991.98px) {
-            body { overflow: auto; }
+            body { overflow: auto; padding-bottom: 100px; }
             .container-fluid, .row { height: auto; }
             .sidebar {
                 height: auto;
@@ -56,6 +75,10 @@
             .sidebar { padding: 10px; }
             .navbar-brand { font-size: 1rem; }
             .btn-sm { padding: 0.4rem 0.6rem; }
+            .dev-footer { height: auto; padding: 10px 14px; flex-wrap: wrap; }
+            .dev-footer img, .dev-footer .avatar-fallback { width: 48px; height: 48px; margin-right: 10px; }
+            .dev-footer .dev-bio { display: none; }
+            .dev-footer .dev-links { margin-left: 0; padding-left: 58px; width: 100%; }
         }
     </style>
 </head>
@@ -463,13 +486,14 @@ function clearSelection() {
 
 initChart();
 </script>
-	<!-- ===== About the developer ===== -->
+
+<!-- ===== About the developer ===== -->
 <div class="dev-footer">
     <img src="viresh.jpg" alt="Viresh Jadhav" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
     <div class="avatar-fallback" style="display:none;"><i class="bi bi-person-fill"></i></div>
     <div>
         <p class="dev-name mb-0">Viresh Jadhav</p>
-        <p class="dev-role mb-0">Petrophysicist &amp; Machine Learning Enthusiast</p>
+        <p class="dev-role mb-0">Petrophysicist </p>
         <p class="dev-bio mb-0">Enthusiast of building workflows, automation, and machine learning tools that simplify petrophysics — turning everyday interpretation tasks into faster, more reliable processes.</p>
     </div>
     <div class="dev-links">
@@ -478,5 +502,6 @@ initChart();
         <a href="#" target="_blank" class="dev-link" title="GitHub"><i class="bi bi-github"></i></a>
     </div>
 </div>
+
 </body>
 </html>
